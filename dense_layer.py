@@ -9,24 +9,24 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import argparse
 
-# 定义数据读取函数
+# Define data & reading function
 def read_data(path):
     data = []
     with open(path, 'r') as file:
         for line in file:
-            line = line.strip()  # 去除行尾的换行符和空格
+            line = line.strip()  # Remove newlines and spaces at the end of lines
             if line:
-                parts = line.split(' ')  # 使用空格分隔行中的部分
-                label = int(parts[0])  # 第一个部分为标签值
+                parts = line.split(' ')  # Use spaces to separate sections in a line
+                label = int(parts[0])  # The first part is the tag value
                 features = {}
                 for feature in parts[1:]:
-                    index, value = feature.split(':')  # 使用冒号分隔特征的索引和值
+                    index, value = feature.split(':')  # Use a colon to separate the index and value of a feature
                     index = int(index)
                     value = float(value)
                     features[index] = value
                 data.append((label, features))
 
-    # 处理缺少的值，置零
+    # Handle missing values, set to zero
     X, y = [], []
     for i, item in enumerate(data):
         label, features = item
@@ -40,13 +40,13 @@ def read_data(path):
         X.append(feat)
     X = np.vstack(X)
     y = np.array(y)
-    # 将标签为-1的值设为0
+    # Set the value labeled -1 to 0
     y[y==-1] = 0
     print(X.shape, y.shape)
     return X, y
          
 
-# 定义感知机模型
+# Define the perceptron model
 class Perceptron(nn.Module):
     def __init__(self, input_size):
         super(Perceptron, self).__init__()
@@ -58,7 +58,7 @@ class Perceptron(nn.Module):
         x = self.activation(x)
         return x
     
-# 定义多层感知机模型
+# Define multilayer perceptron model
 class MLP(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_layers):
         super(MLP, self).__init__()
@@ -96,65 +96,65 @@ if __name__ == '__main__':
     X, y = read_data(args.data)
     
     if args.model == 'Perceptron':
-        # 创建感知机模型实例
+        # Create a perceptron model instance
         model = Perceptron(args.input_size)
     elif args.model == 'MLP':
-        # 创建MLP模型实例
+        # 创Build an MLP model example
         model = MLP(args.input_size, args.hidden_size, args.output_size, args.num_layers)
     else:
         print('no such model')
         exit(-1)
 
-    # 定义损失函数和优化器
-    criterion = nn.BCELoss()  # 二分类交叉熵损失函数
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)  # 优化器
+    # Define loss function and optimizer
+    criterion = nn.BCELoss()  # Binary classification cross entropy loss function
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)  # optimizer
     
-    # 设置学习率调度器
+    # Set learning rate scheduler
     # scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=1000, verbose=True)
     scheduler = ExponentialLR(optimizer, gamma=1)
     
-    # 划分训练集和测试集
+    # Divide training set and test set
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # 转换数据和标签为PyTorch的Tensor
+    # Convert data and labels to PyTorch Tensor
     X_train = torch.from_numpy(X_train).float()
     X_test = torch.from_numpy(X_test).float()
     y_train = torch.from_numpy(y_train).unsqueeze(1).float()
     y_test = torch.from_numpy(y_test).unsqueeze(1).float()
 
 
-    # 记录训练过程中的loss和准确率
+    # Record loss and accuracy during training
     train_losses = []
     test_losses = []
     train_accs = []
     test_accs = []
     
-    # 跟踪最高准确率和保存模型
+    # Track top accuracy and save models
     best_acc = 0.0
     best_model_path = 'best_model.pt'
 
-    # 开始训练循环
+    # Start training cycle
     for epoch in tqdm(range(args.num_epochs)):
         for batch_start in range(0, X_train.size(0), args.batch_size):
-            # 获取当前批次的数据和标签
+            # Get the data and labels of the current batch
             batch_inputs = X_train[batch_start:batch_start + args.batch_size]
             batch_targets = y_train[batch_start:batch_start + args.batch_size]
 
-            # 前向传播
+            # forward propagation
             outputs = model(batch_inputs)
 
-            # 计算损失
+            # Calculate losses
             loss = criterion(outputs, batch_targets)
 
-            # 反向传播和优化
+            # Backpropagation and optimization
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             
-        # 调整学习率
+        # Adjust learning rate
         scheduler.step()
         
-        # 在每个epoch结束后计算训练集和测试集上的loss和准确率
+        # Calculate the loss and accuracy on the training set and test set after each epoch.
         with torch.no_grad():
             train_outputs = model(X_train)
             train_loss = criterion(train_outputs, y_train)
@@ -171,20 +171,20 @@ if __name__ == '__main__':
             train_accs.append(train_acc)
             test_accs.append(test_acc)
 
-            # 如果当前测试准确率是历史最高准确率，则保存模型
+            # If the current test accuracy is the highest historical accuracy, save the model
             if test_acc > best_acc:
                 best_acc = test_acc
                 torch.save(model.state_dict(), best_model_path)
-        # 打印每个epoch的loss和准确率
+        # Print the loss and accuracy of each epoch
         print(f'Epoch [{epoch+1}/{args.num_epochs}], Train Loss: {train_loss.item()}, Train Acc: {train_acc}')
         print(f'Epoch [{epoch+1}/{args.num_epochs}], Test Loss: {test_loss.item()}, Test Acc: {test_acc}')
 
     print(f'Best Test Acc: {best_acc}')
     
-    # 保存模型
+    # Save model
     torch.save(model.state_dict(), 'final_model.pt')
     
-    # 绘制loss曲线
+    # Draw loss curve
     plt.figure()
     plt.plot(range(1, args.num_epochs+1), train_losses, label='Train Loss')
     plt.plot(range(1, args.num_epochs+1), test_losses, label='Test Loss')
@@ -193,7 +193,7 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
 
-    # 绘制准确率曲线
+    # Draw accuracy curve
     plt.figure()
     plt.plot(range(1, args.num_epochs+1), train_accs, label='Train Acc')
     plt.plot(range(1, args.num_epochs+1), test_accs, label='Test Acc')
